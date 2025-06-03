@@ -4,7 +4,7 @@ Este simulador modela o escoamento monofásico incompressível em um meio poroso
 
 ## Matemática por Trás do Simulador
 
-O simulador resolve numericamente a **equação de escoamento monofásico incompressível** em um meio poroso, baseada na **Lei de Darcy** e no **princípio de conservação de massa**.
+O simulador resolve numericamente a **equação de escoamento monofásico incompressível** em um meio poroso.
 
 ### Equação governante (forma contínua):
 
@@ -24,7 +24,7 @@ Onde:
 
 ### Discretização por Diferenças Finitas
 
-A malha é estruturada, e a equação é discretizada usando a formulação de **diferenças finitas com médias harmônicas** para transmissibilidade nas interfaces entre blocos:
+A malha é estruturada, e a equação é discretizada formulando a transmissibilidade nas interfaces entre blocos:
 
 #### Transmissibilidade entre dois blocos adjacentes:
 
