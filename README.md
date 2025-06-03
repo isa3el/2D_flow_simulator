@@ -1,9 +1,5 @@
 # Simulador de Escoamento Monofásico 2D
 
-Trabalho 01 da disciplina MAT2490
-
-Aluna Isabel Goncalves - 2312237
-
 Este simulador modela o escoamento monofásico incompressível em um meio poroso bidimensional (2D).
 
 ## Matemática por Trás do Simulador
