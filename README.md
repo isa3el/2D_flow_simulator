@@ -22,7 +22,7 @@ Onde:
 * $p$: pressão (kPa)
 * $q_s$: fonte ou sumidouro (vazão de poço)
 
-### Discretização por Diferenças Finitas
+### Discretização
 
 A malha é estruturada, e a equação é discretizada formulando a transmissibilidade nas interfaces entre blocos:
 
