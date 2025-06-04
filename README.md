@@ -1,10 +1,13 @@
 # Simulador de Escoamento Monofásico 2D
 
+Trabalho 01 da disciplina MAT2490
+Aluna Isabel Goncalves - 2312237
+
 Este simulador modela o escoamento monofásico incompressível em um meio poroso bidimensional (2D).
 
 ## Matemática por Trás do Simulador
 
-O simulador resolve numericamente a **equação de escoamento monofásico incompressível** em um meio poroso.
+O simulador resolve numericamente a **equação de escoamento monofásico incompressível** em um meio poroso, baseada na **Lei de Darcy** e no **princípio de conservação de massa**.
 
 ### Equação governante (forma contínua):
 
@@ -22,9 +25,9 @@ Onde:
 * $p$: pressão (kPa)
 * $q_s$: fonte ou sumidouro (vazão de poço)
 
-### Discretização
+### Discretização por Diferenças Finitas
 
-A malha é estruturada, e a equação é discretizada formulando a transmissibilidade nas interfaces entre blocos:
+A malha é estruturada, e a equação é discretizada usando a formulação de **diferenças finitas com médias harmônicas** para transmissibilidade nas interfaces entre blocos:
 
 #### Transmissibilidade entre dois blocos adjacentes:
 
@@ -58,6 +61,19 @@ Cada poço pode ser controlado por:
 * As médias harmônicas são usadas para preservar o comportamento físico em transições bruscas de permeabilidade.
 * A matriz $\mathbf{T}$ é montada com esquema de 5 pontos (célula e seus quatro vizinhos).
 * A solução é feita via solver direto do `scipy.sparse.linalg`.
+
+### Cálculo da Vazão nos Poços
+
+A vazão de cada poço é calculada pelo **Well Index (WI)**: baseado na permeabilidade anisotrópica (kx, ky), dimensões da célula (dx, dy), espessura do reservatório (h), raio do poço (rw) e fator de dano (skin). A vazão é então dada por:
+
+
+$q = \frac{WI \cdot (p_{\text{poço}} - p_{\text{célula}})}{\mu}$
+
+com 
+
+$WI = \frac{2 \pi k h}{\ln\left(\frac{r_e}{r_w}\right) + s}$
+
+---
 
 ## Funcionalidades Principais
 
@@ -120,6 +136,10 @@ PRO 2 3 PRESSAO 320.0
 
   * `resultados.txt`: contém todas as informações conhecidas do reservatório, os dados de produção dos poços, mapa de pressão e mapas de permeabilidade nas direções X e Y
   * `mapa_pressao.png`, `mapa_permeabilidade.png` e `mapa_pressao_com_valores.png`
+
+---
+
+
 
 ## Estrutura do Repositório
 
