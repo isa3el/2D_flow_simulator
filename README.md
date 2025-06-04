@@ -22,9 +22,9 @@ Onde:
 * $p$: pressão (kPa)
 * $q_s$: fonte ou sumidouro (vazão de poço)
 
-### Discretização por Diferenças Finitas
+### Discretização 
 
-A malha é estruturada, e a equação é discretizada usando a formulação de **diferenças finitas com médias harmônicas** para transmissibilidade nas interfaces entre blocos:
+A malha é estruturada, e a equação é discretizada usando a formulação de **com médias harmônicas** para transmissibilidade nas interfaces entre blocos:
 
 #### Transmissibilidade entre dois blocos adjacentes:
 
@@ -55,13 +55,12 @@ Cada poço pode ser controlado por:
 
 ### Observações Finais
 
-* As médias harmônicas são usadas para preservar o comportamento físico em transições bruscas de permeabilidade.
 * A matriz $\mathbf{T}$ é montada com esquema de 5 pontos (célula e seus quatro vizinhos).
 * A solução é feita via solver direto do `scipy.sparse.linalg`.
 
 ### Cálculo da Vazão nos Poços
 
-A vazão de cada poço é calculada pelo **Well Index (WI)**: baseado na permeabilidade anisotrópica (kx, ky), dimensões da célula (dx, dy), espessura do reservatório (h), raio do poço (rw) e fator de dano (skin). A vazão é então dada por:
+A vazão de cada poço é calculada pelo **Well Index (WI)** baseado na permeabilidade anisotrópica (kx, ky), dimensões da célula (dx, dy), espessura do reservatório (h), raio do poço (rw) e fator de dano (skin). A vazão é então dada por:
 
 
 $q = \frac{WI \cdot (p_{\text{poço}} - p_{\text{célula}})}{\mu}$
