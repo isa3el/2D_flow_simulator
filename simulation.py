@@ -17,9 +17,8 @@ from plot_functions import plot_pressure_field, plot_permeability_fields, plot_p
 # Os diretórios disponíveis possuem "60_60", "15_15" e "5_5" no nome apenas para fins de identificação.
 # O simulador é genérico e capaz de rodar reservatórios de qualquer tamanho, desde que os arquivos de entrada estejam no formato esperado.
 
-
 # Descomente abaixo o diretório que será utilizado:
-data_dir = "Grid_60_60"
+#data_dir = "Grid_60_60"
 #data_dir = "Grid_15_15"
 #data_dir = "Grid_5_5"
 
@@ -34,10 +33,11 @@ NX, NY, dx, dy, h, active, kx, ky, mu, rho, wells = read_input_file(input_path, 
 P = build_simulator(NX, NY, dx, dy, h, active, kx, ky, mu, wells)
 print(P)
 
-wells_prod = compute_well_flows(P, NX, NY, dx, dy, h, active, kx, ky, mu, wells)
+wells_prod_wi = compute_well_flows(P, kx, ky, h, mu, wells, dx, dy)
 
 plot_pressure_field(P, wells, data_dir)
 plot_permeability_fields(kx, ky, wells, data_dir)
 plot_pressure_map_with_values(P, wells, data_dir)
 
-export_well_results(wells_prod, data_dir, NX, NY, dx, dy, h, mu, rho, P, kx, ky)
+export_well_results(wells_prod_wi, data_dir, NX, NY, dx, dy, h, mu, rho, P, kx, ky)
+
