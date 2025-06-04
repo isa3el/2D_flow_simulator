@@ -66,161 +66,176 @@ def read_input_file(filename, grid_file, permx_file, permy_file):
     return NX, NY, dx, dy, h, active, kx, ky, mu, rho, wells
 
 
-def build_simulator(NX, NY, dx, dy, h, active, kx, ky, mu, wells):
+import numpy as np
+import scipy.sparse as sp
+import scipy.sparse.linalg as spla
+
+def build_simulator(NX, NY, dx, dy, h, active, kx, ky, mu, wells, rw=0.1, s=0.0):
     """
     Constroi e resolve o sistema de equações de escoamento monofásico incompressível
-    em duas dimensões utilizando diferenças finitas e lei de Darcy.
-
+    em duas dimensões.
+    
     Parâmetros:
-    - NX, NY: dimensões da malha (número de células em X e Y)
-    - dx, dy: listas com os tamanhos das células em cada direção (m)
-    - h: espessura do reservatório (m)
-    - active: matriz (NY x NX) com 1 para células ativas e 0 para inativas
-    - kx, ky: matrizes de permeabilidade nas direções X e Y (mD)
-    - mu: viscosidade do fluido (cP)
-    - wells: lista de dicionários com informações dos poços (posição, tipo e valor)
+    - NX, NY: dimensões da malha em X e Y
+    - dx, dy: tamanhos das células nas direções X e Y
+    - h: espessura do reservatório
+    - active: matriz (NY x NX) indicando se uma célula está ativa (1) ou não (0)
+    - kx, ky: permeabilidades nas direções X e Y (mD)
+    - mu: viscosidade do fluido (cP convertido para Pa.s)
+    - wells: lista de dicionários com dados dos poços (posição, tipo, controle, valor)
+    - rw: raio do poço (default: 0.1 m)
+    - s: skin factor (default: 0.0)
 
     Retorno:
-    - Matriz (NY x NX) com o campo de pressões (kPa) em cada célula ativa
+    - Campo de pressão (matriz NY x NX)
     """
-    N = NX * NY
-    T = sp.lil_matrix((N, N))
-    Q = np.zeros(N)
+
+    N = NX * NY                 # número total de células
+    T = sp.lil_matrix((N, N))   # matriz de transmissibilidades (forma esparsa)
+    Q = np.zeros(N)             # vetor de fontes (vazões)
 
     def get_index(i, j):
+        # Converte coordenadas (i,j) em índice 1D
         return i * NX + j
 
     for i in range(NY):
         for j in range(NX):
             if active[i, j] == 0:
-                continue
+                continue    # pula células inativas
 
             idx = get_index(i, j)
 
-            # Para cada vizinho:
-            # Cálculo da transmissibilidade com o vizinho à esquerda:
-            # - Média harmônica da permeabilidade (kx_eff)
-            # - Transmissibilidade Tx pela Lei de Darcy:
-            #   Tx = (kx_eff * h) / (mu * distância média entre centros)
-            # - Atualização da matriz T: termo diagonal e vizinho
-
-            # Vizinho a esquerda
-            if j > 0 and active[i, j-1] == 1:
-                kx_eff = 2 * kx[i, j] * kx[i, j-1] / (kx[i, j] + kx[i, j-1])
-                Tx = (kx_eff * h) / (mu * (dx[j] + dx[j-1]) / 2)
+            # Transmissibilidade nas 4 direções
+            
+            # Transmissibilidade para a esquerda
+            if j > 0 and active[i, j - 1]:
+                kx_eff = 2 * kx[i, j] * kx[i, j - 1] / (kx[i, j] + kx[i, j - 1])
+                Tx = (kx_eff * h) / (mu * (dx[j] + dx[j - 1]) / 2)
                 T[idx, idx] += Tx
-                T[idx, get_index(i, j-1)] -= Tx
+                T[idx, get_index(i, j - 1)] -= Tx
 
-            # Vizinho à direita
-            if j < NX-1 and active[i, j+1] == 1:
-                kx_eff = 2 * kx[i, j] * kx[i, j+1] / (kx[i, j] + kx[i, j+1])
-                Tx = (kx_eff * h) / (mu * (dx[j] + dx[j+1]) / 2)
+            # Transmissibilidade para a direita
+            if j < NX - 1 and active[i, j + 1]:
+                kx_eff = 2 * kx[i, j] * kx[i, j + 1] / (kx[i, j] + kx[i, j + 1])
+                Tx = (kx_eff * h) / (mu * (dx[j] + dx[j + 1]) / 2)
                 T[idx, idx] += Tx
-                T[idx, get_index(i, j+1)] -= Tx
+                T[idx, get_index(i, j + 1)] -= Tx
 
-            # Vizinho abaixo
-            if i > 0 and active[i-1, j] == 1:
-                ky_eff = 2 * ky[i, j] * ky[i-1, j] / (ky[i, j] + ky[i-1, j])
-                Ty = (ky_eff * h) / (mu * (dy[i] + dy[i-1]) / 2)
+            # Transmissibilidade para cima
+            if i > 0 and active[i - 1, j]:
+                ky_eff = 2 * ky[i, j] * ky[i - 1, j] / (ky[i, j] + ky[i - 1, j])
+                Ty = (ky_eff * h) / (mu * (dy[i] + dy[i - 1]) / 2)
                 T[idx, idx] += Ty
-                T[idx, get_index(i-1, j)] -= Ty
+                T[idx, get_index(i - 1, j)] -= Ty
 
-            # Vizinho acima
-            if i < NY-1 and active[i+1, j] == 1:
-                ky_eff = 2 * ky[i, j] * ky[i+1, j] / (ky[i, j] + ky[i+1, j])
-                Ty = (ky_eff * h) / (mu * (dy[i] + dy[i+1]) / 2)
+            # Transmissibilidade para baixo
+            if i < NY - 1 and active[i + 1, j]:
+                ky_eff = 2 * ky[i, j] * ky[i + 1, j] / (ky[i, j] + ky[i + 1, j])
+                Ty = (ky_eff * h) / (mu * (dy[i] + dy[i + 1]) / 2)
                 T[idx, idx] += Ty
-                T[idx, get_index(i+1, j)] -= Ty
+                T[idx, get_index(i + 1, j)] -= Ty
 
-        # Aplicação dos poços com controle por pressão ou vazão
     for w in wells:
-        i, j = w["i"], w["j"]
+        i, j = w["i"], w["j"]  # posição do poço
         idx = get_index(i, j)
 
         if active[i, j] == 0:
-            raise ValueError(f"Poço posicionado em célula inativa: ({i}, {j})")
+            raise ValueError(f"Poço em célula inativa ({i}, {j})")
 
-        if w["controle"] == "PRESSAO":
-            # Define pressão imposta: zera linha e coluna, coloca 1 na diagonal e valor em Q
-            T[idx, :] = 0
-            T[idx, idx] = 1
-            Q[idx] = w["valor"]
+        ctrl = w["controle"]    # "PRESSAO" ou "VAZAO"
+        valor = w["valor"]      # valor associado ao controle
 
-        elif w["controle"] == "VAZAO":
-            # Define vazão imposta: apenas adiciona valor em Q
-            Q[idx] += w["valor"]
+        if ctrl == "VAZAO":
+             # Controle por vazão: fonte ou sumidouro
+            Q[idx] += valor
 
+        elif ctrl == "PRESSAO":
+            # Controle por pressão: WI
+            kx_ij = kx[i, j]
+            ky_ij = ky[i, j]
+
+            dx_ = dx[j] if isinstance(dx, (list, np.ndarray)) else dx
+            dy_ = dy[i] if isinstance(dy, (list, np.ndarray)) else dy
+
+            if kx_ij <= 0 or ky_ij <= 0:    
+                continue  
+
+            # Cálculo do raio equivalente (req) para meio anisotrópico
+            term1 = np.sqrt(ky_ij / kx_ij) * dx_**2
+            term2 = np.sqrt(kx_ij / ky_ij) * dy_**2
+            numerator = np.sqrt(term1 + term2)
+            denominator = (ky_ij / kx_ij)**0.25 + (kx_ij / ky_ij)**0.25
+            req = 0.28 * numerator / denominator
+
+            # Termo logarítmico no denominador do WI
+            log_term = np.log(req / rw) + s
+            if abs(log_term) < 1e-6:
+                log_term = 1e-6
+
+            WI = (2 * np.pi * np.sqrt(kx_ij * ky_ij) * h) / log_term
+
+            T_poço = WI / mu
+            T[idx, idx] += T_poço
+            Q[idx] += T_poço * valor  
+
+    # Resolve o sistema linear T * P = Q
     T = T.tocsr()
     P = spla.spsolve(T, Q)
     return P.reshape((NY, NX))
 
 
-def compute_well_flows(P, NX, NY, dx, dy, h, active, kx, ky, mu, wells):
+def compute_well_flows(P, kx, ky, h, mu, wells, dx, dy, rw=0.1, s=0.0):
     """
-    Calcula a vazão dos poços com base nas pressões simuladas.
+    Calcula a vazão dos poços usando WI com anisotropia e adiciona a cada poço a chave 'q_wi'.
 
-    Parâmetros:
-    - P: matriz de pressão (NY x NX) [kPa]
-    - NX, NY, dx, dy, h: dimensões da malha e propriedades geométricas
-    - active: matriz (NY x NX) com 1 para células ativas e 0 para inativas
-    - kx, ky: permeabilidades nas direções X e Y (mD)
-    - mu: viscosidade do fluido (cP)
-    - wells: lista de dicionários com os poços
-      (chaves: "i", "j", "tipo", "controle", "valor")
+    Modifica os dicionários da lista wells in-place.
 
-    Retorno:
-    - Lista de tuplas: (i, j, tipo, controle, pressão [kPa], vazão [m³/dia])
+    Retorna:
+    - Lista de tuplas: (i, j, tipo, controle, pressão [kPa], vazão [m³/dia]) para possível exportação
     """
-
-    def get_index(i, j):
-        return i * NX + j
-
-    well_results = []
+    results = []
 
     for w in wells:
         i, j = w['i'], w['j']
+        ctrl = w['controle']
+        tipo = w.get('tipo', '')
+        val = w['valor']
 
-        if active[i, j] == 0:
-            raise ValueError(f"Poço posicionado em célula inativa: ({i}, {j})")
+        if ctrl == 'PRESSAO':
+            p_well = val
+            p_res = P[i, j]
 
-        controle = w['controle']
-        tipo = w['tipo']
-        
-        if controle == 'PRESSAO':
-            pressure = w['valor']
-            flow = 0.0
+            kx_ij = kx[i, j]
+            ky_ij = ky[i, j]
 
-            for ni, nj in [(i-1, j), (i+1, j), (i, j-1), (i, j+1)]:
-                if 0 <= ni < NY and 0 <= nj < NX and active[ni, nj]:
-                    dp = pressure - P[ni, nj]
-                    if ni == i:
-                        # vizinho na mesma linha → direção X
-                        k_eff = 2 * kx[i, j] * kx[ni, nj] / (kx[i, j] + kx[ni, nj])
-                        dist = (dx[j] + dx[nj]) / 2
-                    else:
-                        # vizinho na mesma coluna → direção Y
-                        k_eff = 2 * ky[i, j] * ky[ni, nj] / (ky[i, j] + ky[ni, nj])
-                        dist = (dy[i] + dy[ni]) / 2
+            dx_ = dx[j] if isinstance(dx, (list, np.ndarray)) else dx
+            dy_ = dy[i] if isinstance(dy, (list, np.ndarray)) else dy
 
-                    trans = (k_eff * h) / (mu * dist)
-                    flow += trans * dp
+            # Raio efetivo com anisotropia (fórmula)
+            term1 = np.sqrt(ky_ij / kx_ij) * dx_**2
+            term2 = np.sqrt(kx_ij / ky_ij) * dy_**2
+            numerator = np.sqrt(term1 + term2)
+            denominator = (ky_ij / kx_ij)**0.25 + (kx_ij / ky_ij)**0.25
+            req = 0.28 * numerator / denominator
 
-            well_results.append((i, j, tipo, 'PRESSAO', pressure, flow))
+            WI = (2 * np.pi * np.sqrt(kx_ij * ky_ij) * h) / (np.log(req / rw) + s)
 
-        elif controle == 'VAZAO':
-            flow = w['valor']
-            pressure = P[i, j]
-            well_results.append((i, j, tipo, 'VAZAO', pressure, flow))
+            q = WI * (p_well - p_res) / mu
+            w['q_wi'] = q  # adiciona ao dicionário
+            w['p_wi'] = p_well
 
-        else:
-            raise ValueError(f"Controle desconhecido: {controle}")
+            results.append((i, j, tipo, ctrl, p_well, q))
 
-    # Impressão dos resultados
-    print("Resultados dos Poços:")
-    for i, j, tipo, controle, pres, q in well_results:
-        print(f"Poço em ({i}, {j}) | Tipo: {tipo} | Controle: {controle} | Pressão [kPa]: {pres:.2f} | Vazão [m³/dia]: {q:.2f}")
+        elif ctrl == 'VAZAO':
+            q = val
+            p_res = P[i, j]
+            w['q_wi'] = q
+            w['p_wi'] = p_res
 
-    return well_results
+            results.append((i, j, tipo, ctrl, p_res, q))
+
+    return results
+
 
 
 def export_well_results(well_results, data_dir, NX, NY, dx, dy, h, mu, rho, P, kx, ky):
@@ -260,6 +275,58 @@ def export_well_results(well_results, data_dir, NX, NY, dx, dy, h, mu, rho, P, k
             f.write(" ".join(f"{val:7.2f}" for val in row) + "\n")
 
         f.write("\n=== PERMEABILIDADE NA DIREÇÃO X (kx) [mD] ===\n")
+        for row in kx:
+            f.write(" ".join(f"{val:7.2f}" for val in row) + "\n")
+
+        f.write("\n=== PERMEABILIDADE NA DIREÇÃO Y (ky) [mD] ===\n")
+        for row in ky:
+            f.write(" ".join(f"{val:7.2f}" for val in row) + "\n")
+
+    print(f"Arquivo salvo em: {output_path}")
+
+
+def export_well_results_comparativo(wells_prod_darcy, wells_prod_wi, data_dir, NX, NY, dx, dy, h, mu, rho, P, kx, ky):
+    """
+    Exporta os resultados dos poços comparando o método de Darcy e o WI.
+    Inclui também informações do reservatório e, se possível, mapas.
+
+    Parâmetros:
+    - wells_prod_darcy: lista (i, j, tipo, controle, pressão, vazao_darcy)
+    - wells_prod_wi: lista (i, j, tipo, controle, pressão, vazao_wi)
+    - data_dir: diretório onde salvar
+    - NX, NY, dx, dy, h, mu, rho: propriedades do reservatório
+    - P, kx, ky: mapas 2D
+    """
+    
+    output_path = os.path.join(data_dir, "results.txt")
+
+    with open(output_path, 'w') as f:
+        f.write("=== INFORMAÇÕES DO RESERVATÓRIO ===\n")
+        f.write(f"Dimensões da malha: NX = {NX}, NY = {NY}\n")
+        f.write(f"Tamanho das células em X (dx) [m]: {dx}\n")
+        f.write(f"Tamanho das células em Y (dy) [m]: {dy}\n")
+        f.write(f"Espessura (h) [m]: {h}\n")
+        f.write(f"Viscosidade do fluido (mu) [cP]: {mu}\n")
+        f.write(f"Densidade do fluido (rho) [kg/m³]: {rho}\n\n")
+
+        f.write("=== COMPARAÇÃO DE RESULTADOS DOS POÇOS ===\n")
+        f.write(f"{'i':>3} {'j':>3} {'tipo':<10} {'controle':<10} {'pressao_kPa':>12} {'q_Darcy':>12} {'q_WI':>12}\n")
+        
+        for wd, ww in zip(wells_prod_darcy, wells_prod_wi):
+            i1, j1, tipo1, ctrl1, pres1, q_darcy = wd
+            i2, j2, tipo2, ctrl2, pres2, q_wi = ww
+
+            # Verificação básica (assume mesma ordem)
+            assert (i1, j1) == (i2, j2), f"Poços em ordem diferente: ({i1},{j1}) ≠ ({i2},{j2})"
+
+            f.write(f"{i1:>3} {j1:>3} {tipo1:<10} {ctrl1:<10} {pres1:12.2f} {q_darcy:12.2f} {q_wi:12.2f}\n")
+
+        
+        f.write("\n=== MAPA DE PRESSÃO [kPa] ===\n")
+        for row in P:
+            f.write(" ".join(f"{val:7.2f}" for val in row) + "\n")
+
+        f.write("\n=== PERMEAfBILIDADE NA DIREÇÃO X (kx) [mD] ===\n")
         for row in kx:
             f.write(" ".join(f"{val:7.2f}" for val in row) + "\n")
 
