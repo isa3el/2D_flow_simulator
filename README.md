@@ -44,9 +44,8 @@ $$
 
 ### Condições nos Poços
 
-Cada poço pode ser controlado por:
-
-* **Pressão imposta**: substitui a equação da célula pela condição $p = p_{\text{poço}}$
+Cada poço pode ser controlado por:  
+**Pressão imposta**: conhecida como BHP
 * **Vazão imposta**: valor inserido diretamente no vetor $\mathbf{Q}$
 
 ### Observações Finais
