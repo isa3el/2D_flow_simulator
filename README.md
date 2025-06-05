@@ -22,10 +22,6 @@ Onde:
 * $p$: pressão (kPa)
 * $q_s$: fonte ou sumidouro (vazão de poço)
 
-### Discretização 
-
-A malha é estruturada, e a equação é discretizada usando a formulação de **com médias harmônicas** para transmissibilidade nas interfaces entre blocos:
-
 #### Transmissibilidade entre dois blocos adjacentes:
 
 $$
