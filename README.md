@@ -2,7 +2,7 @@
 
 Este simulador modela o escoamento monofásico incompressível em um meio poroso bidimensional (2D).
 
-## Matemática por Trás do Simulador
+## Matemática por trás do Simulador
 
 O simulador resolve numericamente a **equação de escoamento monofásico incompressível** em um meio poroso, baseada na **Lei de Darcy** e no **princípio de conservação de massa**.
 
